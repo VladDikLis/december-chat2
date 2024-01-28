@@ -36,12 +36,26 @@ public class ClientHandler {
     private void listenUserChatMessages() throws IOException {
         while (true) {
             String message = in.readUTF();
+            if (server.getUserService().checkKick(username)) {
+                sendMessage("Вы заблокированы");
+                continue;
+            }
             if (message.startsWith("/")) {
                 if (message.equals("/exit")) {
                     break;
                 }
                 if (message.startsWith("/w ")) {
                     // TODO homework chat part 1
+                }
+                if (message.startsWith("/kick ") && server.getUserService().checkAdmin(username)) {
+                    String[] element = message.split(" ", 2);
+                    if (element.length != 2) {
+                        sendMessage("Ошибка выполнения команды");
+                    } else {
+                        server.userGoKick(element[1], this);
+                    }
+                } else {
+                    sendMessage("Недостаточно прав");
                 }
             }
             server.broadcastMessage(username + ": " + message);
@@ -122,7 +136,7 @@ public class ClientHandler {
             sendMessage("СЕРВЕР: указанное имя пользователя уже занято");
             return false;
         }
-        server.getUserService().createNewUser(login, password, registrationUsername);
+        server.getUserService().createNewUser(login, password, registrationUsername, "user");
         username = registrationUsername;
         sendMessage("/authok " + username);
         sendMessage("СЕРВЕР: " + username + ", вы успешно прошли регистрацию, добро пожаловать в чат!");

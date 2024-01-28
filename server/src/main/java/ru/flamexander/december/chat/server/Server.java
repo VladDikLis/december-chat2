@@ -63,7 +63,16 @@ public class Server {
         return false;
     }
 
-    public synchronized void sendPrivateMessage(ClientHandler sender, String receiverUsername, String message) {
-        // TODO homework
+    public synchronized void userGoKick(String username, ClientHandler sender) {
+        for (ClientHandler clientHandler : clients) {
+            if (clientHandler.getUsername().equals(username)) {
+                userService.userKick(username);
+                clientHandler.sendMessage("Вас заблокировали");
+                sender.sendMessage("Пользователь заблокирован");
+                clients.remove(clientHandler);
+                unsubscribe(clientHandler);
+                return;
+            }
+        }
     }
 }
