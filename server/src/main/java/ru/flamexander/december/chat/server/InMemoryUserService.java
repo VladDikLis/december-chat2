@@ -9,11 +9,16 @@ public class InMemoryUserService implements UserService {
         private String login;
         private String password;
         private String username;
+        private String role;
+        private Boolean kick;
 
-        public User(String login, String password, String username) {
+
+        public User(String login, String password, String username, String role) {
             this.login = login;
             this.password = password;
             this.username = username;
+            this.role = role;
+            this.kick = false;
         }
     }
 
@@ -21,9 +26,10 @@ public class InMemoryUserService implements UserService {
 
     public InMemoryUserService() {
         this.users = new ArrayList<>(Arrays.asList(
-                new User("login1", "pass1", "user1"),
-                new User("login2", "pass2", "user2"),
-                new User("login3", "pass3", "user3")
+                new User("login1", "pass1", "user1", "user"),
+                new User("login2", "pass2", "user2", "user"),
+                new User("login3", "pass3", "user3", "user"),
+                new User("login4", "pass4", "admin", "admin")
         ));
     }
 
@@ -38,8 +44,8 @@ public class InMemoryUserService implements UserService {
     }
 
     @Override
-    public void createNewUser(String login, String password, String username) {
-        users.add(new User(login, password, username));
+    public void createNewUser(String login, String password, String username, String role) {
+        users.add(new User(login, password, username, role));
     }
 
     @Override
@@ -61,4 +67,31 @@ public class InMemoryUserService implements UserService {
         }
         return false;
     }
+    @Override
+    public boolean checkAdmin(String username) {
+        for (User user : users) {
+            if (user.username.equals(username)) {
+                if (user.role.equals("admin")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    public void userKick(String username) {
+        for (User u : users) {
+            if (u.username.equals(username)) {
+                u.kick = true;
+            }
+        }
+    }
+    public boolean checkKick(String username) {
+        for (User user : users) {
+            if (user.username.equals(username)) {
+                return user.kick;
+            }
+        }
+        return false;
+    }
+
 }
