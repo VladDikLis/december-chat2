@@ -136,7 +136,7 @@ public class ClientHandler {
             sendMessage("СЕРВЕР: указанное имя пользователя уже занято");
             return false;
         }
-        server.getUserService().createNewUser(login, password, registrationUsername, "user");
+        server.getUserService().createNewUser(login, password, registrationUsername);
         username = registrationUsername;
         sendMessage("/authok " + username);
         sendMessage("СЕРВЕР: " + username + ", вы успешно прошли регистрацию, добро пожаловать в чат!");
