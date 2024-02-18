@@ -4,6 +4,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 public class ClientHandler {
     private Server server;
@@ -34,31 +37,91 @@ public class ClientHandler {
     }
 
     private void listenUserChatMessages() throws IOException {
+        server.getUserService().newActivity(username);
+        new Thread(() -> {
+           while (true) {
+               try {
+                   TimeUnit.SECONDS.sleep(60);
+                   if (server.getUserService().getDowntime(username) <= 0) {
+                       server.unsubscribe(this);
+                   };
+               } catch (InterruptedException e) {}
+           }
+        }).start();
         while (true) {
-            String message = in.readUTF();
-            if (server.getUserService().checkKick(username)) {
-                sendMessage("Вы заблокированы");
-                continue;
+            if (server.getUserService().checkBan(username)) {
+                sendMessage("Вы забанены");
+                return;
             }
+            if (server.getUserService().checkKick(username)) {
+                if (server.getUserService().checkKickDate(username) <= 0) {
+                    server.getUserService().userUnkick(username);
+                } else {
+                    sendMessage("Вы кикнуты. Вход в чат будет доступен менее чем через " + server.getUserService().checkKickDate(username) + " минут");
+                    return;
+                }
+            }
+            server.getUserService().newActivity(username);
+
+            String message = in.readUTF();
             if (message.startsWith("/")) {
                 if (message.equals("/exit")) {
                     break;
                 }
                 if (message.startsWith("/w ")) {
-                    // TODO homework chat part 1
+                    String[] part = message.split(" ", 3);
+                    server.sendPrivateMessage(this, part[1], part[2]);
                 }
-                if (message.startsWith("/kick ") && server.getUserService().checkAdmin(username)) {
+                if (message.startsWith("/kick ")) {
+                    if (server.getUserService().checkAdmin(username)) {
+                        String[] element = message.split(" ", 3);
+                        if (element.length != 3) {
+                            sendMessage("Ошибка выполнения команды");
+                        } else {
+                            server.userGoKick(element[1], this, element[2]);
+                        }
+                    } else {
+                        sendMessage("Недостаточно прав");
+                    }
+                }
+                if (message.startsWith("/ban ")) {
+                    if (server.getUserService().checkAdmin(username)) {
+                        String[] element = message.split(" ", 2);
+                        if (element.length != 2) {
+                            sendMessage("Ошибка выполнения команды");
+                        } else {
+                            server.userGoBan(element[1], this);
+                        }
+                    } else {
+                        sendMessage("Недостаточно прав");
+                    }
+                }
+                if (message.startsWith("/changenick ")) {
                     String[] element = message.split(" ", 2);
                     if (element.length != 2) {
                         sendMessage("Ошибка выполнения команды");
                     } else {
-                        server.userGoKick(element[1], this);
+                        server.userChangeNick(element[1], this, this.username);
+                        this.username = element[1];
                     }
-                } else {
-                    sendMessage("Недостаточно прав");
                 }
+                if (message.startsWith("/activelist")) {
+                    String activeUser = server.getActiveUser();
+                   sendMessage("Список активных пользователей:" + activeUser);
+                }
+                if (message.startsWith("/shutdown")) {
+                    if (server.getUserService().checkAdmin(username)) {
+                        server.broadcastMessage("Администратор завершает работу чата");
+                        System.exit(0);
+                    } else {
+                        sendMessage("Недостаточно прав");
+                    }
+                }
+            } else {
+                Date date = new Date();
+                SimpleDateFormat formatForDateNow = new SimpleDateFormat("hh:mm:ss");
+                server.broadcastMessage("<" + formatForDateNow.format(date) + "> " + username + ": " + message);
             }
-            server.broadcastMessage(username + ": " + message);
         }
     }
 
