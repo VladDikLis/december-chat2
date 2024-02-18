@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS public.users
+(
+    login text COLLATE pg_catalog."default" NOT NULL,
+    password text COLLATE pg_catalog."default" NOT NULL,
+    username text COLLATE pg_catalog."default" NOT NULL,
+    role text COLLATE pg_catalog."default" NOT NULL,
+    kick text COLLATE pg_catalog."default" NOT NULL,
+    ban text COLLATE pg_catalog."default" NOT NULL,
+    kickdate text COLLATE pg_catalog."default",
+    activedate text COLLATE pg_catalog."default",
+    CONSTRAINT users_pkey PRIMARY KEY (login)
+)

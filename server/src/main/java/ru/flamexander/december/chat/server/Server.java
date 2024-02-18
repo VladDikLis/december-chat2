@@ -3,8 +3,11 @@ package ru.flamexander.december.chat.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class Server {
     private int port;
@@ -44,6 +47,14 @@ public class Server {
         }
     }
 
+    public synchronized String getActiveUser() {
+        String usernameStr = " ";
+        for (ClientHandler clientHandler : clients) {
+            usernameStr = usernameStr + clientHandler.getUsername() + "  ";
+        }
+        return usernameStr;
+    }
+
     public synchronized void subscribe(ClientHandler clientHandler) {
         broadcastMessage("Подключился новый клиент " + clientHandler.getUsername());
         clients.add(clientHandler);
@@ -52,6 +63,17 @@ public class Server {
     public synchronized void unsubscribe(ClientHandler clientHandler) {
         clients.remove(clientHandler);
         broadcastMessage("Отключился клиент " + clientHandler.getUsername());
+    }
+
+    public synchronized void sendPrivateMessage(ClientHandler sender, String receiverUsername, String message) {
+        for (ClientHandler clientHandler : clients) {
+            if (clientHandler.getUsername().equals(receiverUsername)) {
+                Date date = new Date();
+                SimpleDateFormat formatForDateNow = new SimpleDateFormat("hh:mm:ss");
+                clientHandler.sendMessage("(Приватно) " + "<" + formatForDateNow.format(date) + "> " + sender.getUsername() + " -> " + receiverUsername + ": " + message);
+                sender.sendMessage("(Приватно) " + "<" + formatForDateNow.format(date) + "> " + sender.getUsername() + " -> " + receiverUsername + ": " + message);
+            }
+        }
     }
 
     public synchronized boolean isUserBusy(String username) {
@@ -63,14 +85,37 @@ public class Server {
         return false;
     }
 
-    public synchronized void userGoKick(String username, ClientHandler sender) {
+    public synchronized void userGoKick(String username, ClientHandler sender, String minutes) {
         for (ClientHandler clientHandler : clients) {
             if (clientHandler.getUsername().equals(username)) {
-                userService.userKick(username);
+                Date date = new Date(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(Long.parseLong(minutes)));
+                String stringDate = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss z").format(date);
+                userService.userKick(username, stringDate);
                 clientHandler.sendMessage("Вас заблокировали");
                 sender.sendMessage("Пользователь заблокирован");
                 clients.remove(clientHandler);
                 unsubscribe(clientHandler);
+                return;
+            }
+        }
+    }
+    public synchronized void userGoBan(String username, ClientHandler sender) {
+        for (ClientHandler clientHandler : clients) {
+            if (clientHandler.getUsername().equals(username)) {
+                userService.userBan(username);
+                clientHandler.sendMessage("Вас заблокировали");
+                sender.sendMessage("Пользователь заблокирован");
+                clients.remove(clientHandler);
+                unsubscribe(clientHandler);
+                return;
+            }
+        }
+    }
+    public synchronized void userChangeNick(String NewUsername, ClientHandler sender, String username) {
+        for (ClientHandler clientHandler : clients) {
+            if (clientHandler.getUsername().equals(username)) {
+                userService.userChangeNick(username, NewUsername);
+                sender.sendMessage("Ник изменён");
                 return;
             }
         }
