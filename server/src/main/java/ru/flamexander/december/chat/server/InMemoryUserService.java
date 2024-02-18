@@ -1,95 +1,166 @@
 package ru.flamexander.december.chat.server;
 
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 public class InMemoryUserService implements UserService {
     class User {
         private String login;
         private String password;
         private String username;
-        private String role;
         private Boolean kick;
+        private String role;
 
 
-        public User(String login, String password, String username, String role) {
+        public User(String login, String password, String username, Boolean kick, String role) {
             this.login = login;
             this.password = password;
             this.username = username;
+            this.kick = kick;
             this.role = role;
-            this.kick = false;
         }
     }
 
-    private List<User> users;
+    private List<InMemoryUserService.User> users;
+    private static final String DB_URL = "jdbc:postgresql://localhost:5432/UsrerRole";
+    private static final String DB_LOGIN = "postgres";
+    private static final String DB_PASSWORD = "228950";
+    private static Connection connect;
+    private static Statement statement;
+    private static PreparedStatement pStatement;
+
+    private void connect() throws SQLException {
+        connect = DriverManager.getConnection(DB_URL, DB_LOGIN, DB_PASSWORD);
+        statement = connect.createStatement();
+    }
 
     public InMemoryUserService() {
-        this.users = new ArrayList<>(Arrays.asList(
-                new User("login1", "pass1", "user1", "user"),
-                new User("login2", "pass2", "user2", "user"),
-                new User("login3", "pass3", "user3", "user"),
-                new User("login4", "pass4", "admin", "admin")
-        ));
+        try {
+            connect();
+            List<InMemoryUserService.User> users = new ArrayList<>();
+            ResultSet rs = statement.executeQuery("Select login, password, username, kick, role from users");
+            while (rs.next()) {
+                users.add(new User(rs.getString("login"),
+                        rs.getString("password"),
+                        rs.getString("username"),
+                        rs.getBoolean("kick"),
+                        rs.getString("role")));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public String getUsernameByLoginAndPassword(String login, String password) {
-        for (User u : users) {
-            if (u.login.equals(login) && u.password.equals(password)) {
-                return u.username;
+        List<InMemoryUserService.User> users = new ArrayList<>();
+        try {
+            pStatement = connect.prepareStatement("Select username from users where login = ? and password = ?");
+            pStatement.setString(1, login);
+            pStatement.setString(2, password);
+            try (ResultSet rs = pStatement.executeQuery()) {
+                while (rs.next()) {
+                    return rs.getString("username");
+                }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return null;
     }
 
     @Override
-    public void createNewUser(String login, String password, String username, String role) {
-        users.add(new User(login, password, username, role));
+    public void createNewUser(String login, String password, String username) {
+        try {
+            pStatement = connect.prepareStatement(
+                    "INSERT INTO users(login, password, username, kick, role) VALUES(?, ?, ?, ?, ?) ");
+            connect.setAutoCommit(true);
+            pStatement.setString(1, login);
+            pStatement.setString(2, password);
+            pStatement.setString(3, username);
+            pStatement.setBoolean(4, false);
+            pStatement.setString(5, "user");
+            pStatement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public boolean isLoginAlreadyExist(String login) {
-        for (User u : users) {
-            if (u.login.equals(login)) {
-                return true;
+        try {
+            pStatement = connect.prepareStatement("Select 1 from users where login = ?");
+            pStatement.setString(1, login);
+            try (ResultSet rs = pStatement.executeQuery()) {
+                while (rs.next()) {
+                    return true;
+                }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return false;
     }
 
     @Override
     public boolean isUsernameAlreadyExist(String username) {
-        for (User u : users) {
-            if (u.username.equals(username)) {
-                return true;
-            }
-        }
-        return false;
-    }
-    @Override
-    public boolean checkAdmin(String username) {
-        for (User user : users) {
-            if (user.username.equals(username)) {
-                if (user.role.equals("admin")) {
+        try {
+            pStatement = connect.prepareStatement("Select 1 from users where username = ?");
+            pStatement.setString(1, username);
+            try (ResultSet rs = pStatement.executeQuery()) {
+                while (rs.next()) {
                     return true;
                 }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return false;
     }
-    public void userKick(String username) {
-        for (User u : users) {
-            if (u.username.equals(username)) {
-                u.kick = true;
+
+    @Override
+    public boolean checkAdmin(String username) {
+        try {
+            pStatement = connect.prepareStatement("Select role from users where username = ?");
+            pStatement.setString(1, username);
+            try (ResultSet rs = pStatement.executeQuery()) {
+                while (rs.next()) {
+                    return (Objects.equals(rs.getString(1), "admin"));
+                }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public void userKick(String username) {
+        try {
+            pStatement = connect.prepareStatement("update users set kick = true where username = ?");
+            connect.setAutoCommit(true);
+            pStatement.setString(1, username);
+            pStatement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
+
+    @Override
     public boolean checkKick(String username) {
-        for (User user : users) {
-            if (user.username.equals(username)) {
-                return user.kick;
+        try {
+            pStatement = connect.prepareStatement("Select kick from users where username = ?");
+            pStatement.setString(1, username);
+            try (ResultSet rs = pStatement.executeQuery()) {
+                while (rs.next()) {
+                    return (Objects.equals(rs.getString(1), "true"));
+                }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
         return false;
     }
